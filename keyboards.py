@@ -3,19 +3,19 @@ from translations import tr, get_user_lang
 
 LANG_KB = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton("RU"), KeyboardButton("EN")],
-        [KeyboardButton("UZ"), KeyboardButton("TJ"), KeyboardButton("KG")]
+        [KeyboardButton(text="RU"), KeyboardButton(text="EN")],
+        [KeyboardButton(text="UZ"), KeyboardButton(text="TJ"), KeyboardButton(text="KG")]
     ],
     resize_keyboard=True
 )
 
 role_kb = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton("Курьер"), KeyboardButton("Сборщик")]],
+    keyboard=[[KeyboardButton(text="Курьер"), KeyboardButton(text="Сборщик")]],
     resize_keyboard=True
 )
 
 shop_kb = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton("Бухарестская"), KeyboardButton("Бабушкина")]],
+    keyboard=[[KeyboardButton(text="Бухарестская"), KeyboardButton(text="Бабушкина")]],
     resize_keyboard=True
 )
 
