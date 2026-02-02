@@ -1,6 +1,6 @@
 from db import get_user
 
-# ===== Словарь переводов =====
+# ===== Переводы =====
 TRANSLATIONS = {
     "welcome": {"RU": "Добро пожаловать!", "EN": "Welcome!"},
     "role_prompt": {"RU": "Выберите вашу роль:", "EN": "Choose your role:"},
@@ -14,9 +14,8 @@ TRANSLATIONS = {
     "change_lang": {"RU": "Сменить язык", "EN": "Change language"}
 }
 
-# ===== Функция для перевода =====
+# ===== Получить перевод =====
 def tr(key, user_id=None):
-    """Возвращает перевод строки по ключу и языку пользователя"""
     lang = "RU"
     if user_id:
         user = get_user(user_id)
@@ -24,9 +23,8 @@ def tr(key, user_id=None):
             lang = user[4]
     return TRANSLATIONS.get(key, {}).get(lang, key)
 
-# ===== Новая функция для получения языка пользователя =====
+# ===== Получить язык пользователя =====
 def get_user_lang(user_id):
-    """Возвращает язык пользователя из базы, по умолчанию 'RU'"""
     user = get_user(user_id)
     if user and user[4]:
         return user[4]
