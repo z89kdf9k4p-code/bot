@@ -130,3 +130,8 @@ async def main():
     dp.message.register(save_feedback_handler, StateFilter(FeedbackState.text))
 
     await dp.
+    start_polling(bot)
+
+
+if name == "__main__":
+    asyncio.run(main())
