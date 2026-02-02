@@ -1,24 +1,35 @@
 import asyncio
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message
 from aiogram.filters import Command, StateFilter
+from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from db import get_user, get_all_users, save_user, save_feedback, cleanup_feedback
 from states import LanguageState, Register, FeedbackState
-from keyboards import get_lang_kb, get_role_kb, get_shop_kb, main_menu, ROLE_BUTTONS, SHOP_BUTTONS
-from keyboards import get_training_kb, SUPERVISOR_CONTACT, get_links_text
+from keyboards import (
+    get_lang_kb, get_role_kb, get_shop_kb, main_menu,
+    get_training_kb, SUPERVISOR_CONTACT, get_links_text
+)
 from translations import tr, get_user_lang
 
 BOT_TOKEN = "8413248579:AAH_AuRcm3yLP6O38w6z-O_SmUq9pZDviHA"
-ADMINS = {1242801964}  # вставь свой ID администратора
+ADMINS = {1242801964}  # Ваш ID администратора
 
-# ---------- Проверка админа ----------
+# ===== Константы кнопки смены языка =====
+CHANGE_LANG_BUTTONS = {
+    "RU": "🌐 Сменить язык",
+    "EN": "🌐 Change language",
+    "UZ": "🌐 Tilni o‘zgartirish",
+    "TJ": "🌐 Забывает язык_TJ",
+    "KG": "🌐 Смена языка_KG"
+}
+
+# ===== Проверка админа =====
 def is_admin(user_id):
     return user_id in ADMINS
 
-# ---------- Хэндлеры ----------
+# ===== Хэндлеры =====
 async def start(message: Message, state: FSMContext):
     await state.clear()
     cleanup_feedback(message.from_user.id)
@@ -38,33 +49,55 @@ async def start(message: Message, state: FSMContext):
         await message.answer(tr("role_prompt", user_id=message.from_user.id), reply_markup=get_role_kb(lang))
         await state.set_state(Register.role)
 
+# ===== Смена языка =====
+async def change_language(message: Message, state: FSMContext):
+    if message.text not in CHANGE_LANG_BUTTONS.values():
+        return
+    await message.answer(tr("choose_language", user_id=message.from_user.id), reply_markup=get_lang_kb())
+    await state.set_state(LanguageState.lang)
+
 async def set_language(message: Message, state: FSMContext):
     text = message.text.strip().upper()
     if text not in {"RU", "EN", "UZ", "TJ", "KG"}:
         await message.answer("Пожалуйста, выбери язык с кнопок 👇", reply_markup=get_lang_kb())
         return
-    save_user(message.from_user.id, message.from_user.username, lang=text)
-    await message.answer(tr("lang_updated", user_id=message.from_user.id), reply_markup=get_role_kb(text))
-    await state.set_state(Register.role)
 
-async def change_language(message: Message, state: FSMContext):
-    await message.answer(tr("choose_language", user_id=message.from_user.id), reply_markup=get_lang_kb())
-    await state.set_state(LanguageState.lang)
+    # Сохраняем язык
+    user = get_user(message.from_user.id)
+    save_user(
+        message.from_user.id,
+        message.from_user.username,
+        role=user[2] if user else None,
+        shop=user[3] if user else None,
+        lang=text
+    )
+    await state.clear()
 
+    user = get_user(message.from_user.id)
+    role, shop, lang = user[2], user[3], user[4]
+
+    # Обновляем главное меню или предлагаем выбрать роль
+    if role and shop:
+        await message.answer(
+            f"{tr('role_confirm', user_id=message.from_user.id)} {role}, ТТ: {shop}\n"
+            f"{tr('help', user_id=message.from_user.id)}",
+            reply_markup=main_menu(role, message.from_user.id, lang)
+        )
+    else:
+        await message.answer(tr("role_prompt", user_id=message.from_user.id), reply_markup=get_role_kb(lang))
+        await state.set_state(Register.role)
+
+# ===== Регистрация роли и магазина =====
 async def set_role(message: Message, state: FSMContext):
     user_lang = get_user_lang(message.from_user.id)
-    if message.text not in ROLE_BUTTONS:
-        return
     await state.update_data(role=message.text)
     await message.answer(tr("choose_shop", user_id=message.from_user.id), reply_markup=get_shop_kb(user_lang))
     await state.set_state(Register.shop)
 
 async def set_shop(message: Message, state: FSMContext):
     user_lang = get_user_lang(message.from_user.id)
-    if message.text not in SHOP_BUTTONS:
-        return
     data = await state.get_data()
-    role = data["role"]
+    role = data.get("role")
     shop = message.text
     save_user(message.from_user.id, message.from_user.username, role=role, shop=shop, lang=user_lang)
     await message.answer(
@@ -73,7 +106,7 @@ async def set_shop(message: Message, state: FSMContext):
     )
     await state.clear()
 
-# ---------- Feedback ----------
+# ===== Feedback =====
 async def feedback_start(message: Message, state: FSMContext):
     await message.answer(tr("feedback", user_id=message.from_user.id))
     await state.set_state(FeedbackState.text)
@@ -83,7 +116,7 @@ async def save_feedback_handler(message: Message, state: FSMContext):
     await message.answer(tr("feedback_thanks", user_id=message.from_user.id))
     await state.clear()
 
-# ---------- Новые кнопки ----------
+# ===== Новые кнопки меню =====
 async def training_menu(message: Message, state: FSMContext):
     user = get_user(message.from_user.id)
     role = user[2] if user else "Курьер"
@@ -95,10 +128,9 @@ async def show_supervisor_contacts(message: Message):
 async def show_links(message: Message):
     user = get_user(message.from_user.id)
     shop = user[3] if user else None
-    text = get_links_text(shop)
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(get_links_text(shop), parse_mode="Markdown")
 
-# ---------- Admin ----------
+# ===== Admin =====
 async def admin_stats(message: Message):
     if not is_admin(message.from_user.id):
         return await message.answer("⛔ Только для админа")
@@ -163,15 +195,15 @@ async def admin_broadcast(message: Message, bot: Bot):
             pass
     await message.answer("✅ Сообщение отправлено всем пользователям")
 
-# ---------- Запуск ----------
+# ===== Запуск =====
 async def main():
     bot = Bot(BOT_TOKEN, parse_mode="HTML")
     dp = Dispatcher(storage=MemoryStorage())
 
     # Пользовательские команды
     dp.message.register(start, Command("start"))
+    dp.message.register(change_language, lambda m: m.text in CHANGE_LANG_BUTTONS.values())
     dp.message.register(set_language, StateFilter(LanguageState.lang))
-    dp.message.register(change_language, F.text.contains("🌐"))
     dp.message.register(set_role, StateFilter(Register.role))
     dp.message.register(set_shop, StateFilter(Register.shop))
     dp.message.register(feedback_start, F.text.contains("Обратная"))
