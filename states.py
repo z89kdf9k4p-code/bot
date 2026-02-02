@@ -9,4 +9,3 @@ class Register(StatesGroup):
 
 class FeedbackState(StatesGroup):
     text = State()
-
