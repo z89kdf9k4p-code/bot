@@ -129,9 +129,8 @@ async def main():
     dp.message.register(feedback_start, F.text.contains(tr("feedback", user_id=None)))
     dp.message.register(save_feedback_handler, StateFilter(FeedbackState.text))
 
-    await dp.
-    start_polling(bot)
+    await dp.start_polling(bot)
 
 
-if name == "__main__":
+if __name__ == "__main__":
     asyncio.run(main())
