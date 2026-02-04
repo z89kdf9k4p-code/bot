@@ -19,7 +19,7 @@ import traceback
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
@@ -55,9 +55,7 @@ from translations import get_user_lang, tr
 # -------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Load .env robustly (works whether you run from project root or another cwd)
-_env_path = find_dotenv(filename=".env", usecwd=True) or os.path.join(BASE_DIR, ".env")
-load_dotenv(_env_path)
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 BOT_DB = os.getenv("BOT_DB", "bot.db").strip() or "bot.db"
@@ -876,19 +874,19 @@ async def daily_off(message: Message, state: FSMContext):
 @router.message(Command("admin"))
 async def admin_help(message: Message):
     if not _is_admin(message.from_user.id):
-        # show user id and currently loaded admin ids to simplify debugging
-        loaded = ", ".join(str(x) for x in sorted(ADMIN_IDS)) or "∅"
-await message.answer(
-    tr("admin_no_access", message.from_user.id, id=message.from_user.id)
-    + f"\nВаш ID: {message.from_user.id}"
-)
-
-ADMIN_IDS loaded: <code>{loaded}</code>
-"
-              f".env used: <code>{_env_path}</code>"
-        )
+        await message.answer(tr("admin_no_access", message.from_user.id, id=message.from_user.id))
         return
-    await message.answer(tr("admin_help", message.from_user.id))
+        await message.answer(tr("admin_help", message.from_user.id))
+
+
+@router.message(Command("stats"))
+async def admin_stats(message: Message):
+    if not _is_admin(message.from_user.id):
+        return
+    users = len(db.get_all_users())
+    fb = len(db.get_feedback())
+    banned = len(db.banned_users)
+    await message.answer(tr("admin_stats_text", message.from_user.id, users=users, fb=fb, banned=banned))
 
 
 @router.message(Command("users"))
