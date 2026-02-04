@@ -11,6 +11,15 @@ import aiosqlite
 import re
 import difflib
 
+async def _fetchone(db, query: str, params: tuple = ()):
+    async with db.execute(query, params) as cursor:
+        return await cursor.fetchone()
+
+
+async def _fetchall(db, query: str, params: tuple = ()):
+    async with db.execute(query, params) as cursor:
+        return await cursor.fetchall()
+
 # ----------------------------
 # Глобальное состояние
 # ----------------------------
