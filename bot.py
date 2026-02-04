@@ -878,9 +878,10 @@ async def admin_help(message: Message):
     if not _is_admin(message.from_user.id):
         # show user id and currently loaded admin ids to simplify debugging
         loaded = ", ".join(str(x) for x in sorted(ADMIN_IDS)) or "∅"
-        await message.answer(
-            tr("admin_no_access", message.from_user.id, id=message.from_user.id)
-            + f"
+await message.answer(
+    tr("admin_no_access", message.from_user.id, id=message.from_user.id)
+    + f"\nВаш ID: {message.from_user.id}"
+)
 
 ADMIN_IDS loaded: <code>{loaded}</code>
 "
