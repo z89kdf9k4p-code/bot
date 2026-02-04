@@ -11,15 +11,6 @@ import aiosqlite
 import re
 import difflib
 
-async def _fetchone(db, query: str, params: tuple = ()):
-    async with db.execute(query, params) as cursor:
-        return await cursor.fetchone()
-
-
-async def _fetchall(db, query: str, params: tuple = ()):
-    async with db.execute(query, params) as cursor:
-        return await cursor.fetchall()
-
 # ----------------------------
 # Глобальное состояние
 # ----------------------------
@@ -46,6 +37,23 @@ class Reminder:
 reminders: list[Reminder] = []
 daily_digest_users: set[int] = set()
 daily_digest_message: str = "Ежедневный дайджест: проверьте обновления в «Обучалки» и «Ссылки»."
+
+
+# ----------------------------
+# SQLite helpers
+# ----------------------------
+
+async def _fetchone(conn: aiosqlite.Connection, query: str, params: tuple = ()) -> aiosqlite.Row | None:
+    async with conn.execute(query, params) as cur:
+        return await cur.fetchone()
+
+async def _fetchall(conn: aiosqlite.Connection, query: str, params: tuple = ()) -> list[aiosqlite.Row]:
+    async with conn.execute(query, params) as cur:
+        return await cur.fetchall()
+
+async def _execute(conn: aiosqlite.Connection, query: str, params: tuple = ()) -> None:
+    await conn.execute(query, params)
+    await conn.commit()
 
 # ----------------------------
 # Init / schema
@@ -103,6 +111,12 @@ DEFAULT_FAQ = [
     ("Как начать работу", "Нажмите /start и пройдите регистрацию: язык → роль → точка.", "start,registration"),
     ("Куда писать при проблемах", "Используйте меню «Контакты супервайзера» или «Обратная связь».", "support,feedback"),
     ("Где взять ссылки", "В меню нажмите «Ссылки» — они зависят от вашей точки.", "links"),
+    ("Основные правила", "• Соблюдайте технику безопасности\n• Следуйте инструкциям супервайзера\n• Проверяйте заказы перед выдачей/выездом", "training,Курьер,Сборщик"),
+    ("Погрузка", "• Аккуратно размещайте товары\n• Тяжёлое — вниз\n• Хрупкое — сверху\n• Проверяйте целостность", "training,Курьер"),
+    ("Подключение терминала", "• Включите терминал\n• Проверьте интернет\n• Войдите в приложение\n• Проведите тестовую операцию", "training,Курьер,Сборщик"),
+    ("Правила сборки", "• Собирайте по списку\n• Проверяйте сроки годности\n• Хрупкое упаковывайте отдельно", "training,Сборщик"),
+    ("Возвраты", "• Зафиксируйте причину\n• Сфотографируйте при необходимости\n• Сообщите старшему смены", "training,Курьер,Сборщик"),
+    ("Закрытие точки", "• Сверьте остатки\n• Уберите рабочее место\n• Сообщите о проблемах супервайзеру", "training,Сборщик"),
 ]
 
 
@@ -355,6 +369,37 @@ async def faq_delete(faq_id: int) -> bool:
 async def faq_list(limit: int = 50) -> list[dict[str, str]]:
     # возвращаем копию
     return list(FAQ_ARTICLES[:limit])
+
+
+def materials_for_role(role: str | None = None, limit: int = 30) -> list[dict[str, str]]:
+    """Список материалов для роли (использует кэш FAQ_ARTICLES).
+
+    Правило фильтрации по тегам:
+    - если tags пустые -> показываем всем
+    - если role задан -> показываем статьи, где role встречается в tags (case-insensitive)
+    - также всегда показываем статьи с тегом 'training' или 'kb'
+    """
+    role_norm = (role or "").strip().lower()
+    out: list[dict[str, str]] = []
+    for a in FAQ_ARTICLES:
+        tags = (a.get("tags") or "").lower()
+        if not tags:
+            out.append(a)
+            continue
+        if "training" in tags or "kb" in tags:
+            if not role_norm or role_norm in tags:
+                out.append(a)
+            else:
+                # training без указания роли — показываем всем
+                if any(r in tags for r in ["курьер", "сборщик"]) is False:
+                    out.append(a)
+            continue
+        if role_norm and role_norm in tags:
+            out.append(a)
+
+    # сортируем по title для стабильности
+    out.sort(key=lambda x: (x.get("title") or "").lower())
+    return out[:limit]
 
 async def faq_edit(faq_id: int, title: str | None = None, body: str | None = None, tags: str | None = None) -> bool:
     assert _db is not None

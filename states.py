@@ -22,3 +22,12 @@ class FAQState(StatesGroup):
 class ReminderState(StatesGroup):
     minutes = State()
     text = State()
+
+
+# ===== Управление обучалками (админ) =====
+class TrainingAdminState(StatesGroup):
+    action = State()      # add/edit/delete
+    title = State()
+    body = State()
+    tags = State()
+    target_id = State()

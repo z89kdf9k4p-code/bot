@@ -27,7 +27,7 @@ from aiogram.enums import ContentType
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, LinkPreviewOptions
 
 import db
 from keyboards import (
@@ -38,13 +38,15 @@ from keyboards import (
     get_links_text,
     get_role_kb,
     get_shop_kb,
+    ROLE_LABELS,
+    SHOP_LABELS,
     get_training_kb,
     main_menu,
     phone_request_kb,
     reminders_menu,
     SUPERVISOR_CONTACT,
 )
-from states import FeedbackState, FAQState, LanguageState, Register, ReminderState
+from states import FeedbackState, FAQState, LanguageState, Register, ReminderState, TrainingAdminState
 from translations import get_user_lang, tr
 
 
@@ -52,17 +54,25 @@ from translations import get_user_lang, tr
 # CONFIG
 # -------------------------
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 BOT_DB = os.getenv("BOT_DB", "bot.db").strip() or "bot.db"
 
-# Admins: comma-separated user ids in .env (ADMIN_IDS=123,456)
-ADMIN_IDS: set[int] = {
-    int(x)
-    for x in os.getenv("ADMIN_IDS", "").split(",")
-    if x.strip().isdigit()
-}
+def _parse_admin_ids(raw: str) -> set[int]:
+    if not raw:
+        return set()
+    raw = raw.replace(",", " ")
+    out: set[int] = set()
+    for part in raw.split():
+        part = part.strip()
+        if part.isdigit():
+            out.add(int(part))
+    return out
+
+# Admins: comma-separated or space-separated user ids in .env (ADMIN_IDS=123,456)
+ADMIN_IDS: set[int] = _parse_admin_ids(os.getenv("ADMIN_IDS", ""))
 
 # Scheduler timezone (as requested by system: Europe/Oslo)
 TZ = ZoneInfo("Europe/Oslo")
@@ -75,6 +85,23 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger("bot")
+logger.info("ADMIN_IDS loaded: %s", sorted(ADMIN_IDS))
+
+
+# Canonical values stored in DB (to keep backward compatibility with existing data)
+ROLE_CANON = {"courier": "Курьер", "picker": "Сборщик"}
+# Reverse maps (button text -> canonical RU value)
+_ROLE_TEXT_TO_RU: dict[str, str] = {}
+for _lang, _labels in ROLE_LABELS.items():
+    _ROLE_TEXT_TO_RU[_labels["courier"]] = ROLE_CANON["courier"]
+    _ROLE_TEXT_TO_RU[_labels["picker"]] = ROLE_CANON["picker"]
+
+_SHOP_TEXT_TO_RU: dict[str, str] = {}
+for _lang, _labels in SHOP_LABELS.items():
+    for _ru_name, _label in _labels.items():
+        # _ru_name is RU shop key (e.g. "Бухарестская"), _label is localized label shown to user
+        _SHOP_TEXT_TO_RU[_label] = _ru_name
+
 
 router = Router()
 
@@ -164,7 +191,7 @@ async def _show_main_menu(message: Message) -> None:
 
     await message.answer(
         tr("help", message.from_user.id),
-        reply_markup=main_menu(role=role, user_id=message.from_user.id, lang=lang),
+        reply_markup=main_menu(role=_ROLE_TEXT_TO_RU.get(role, role), user_id=message.from_user.id, lang=lang),
     )
 
 
@@ -252,8 +279,8 @@ async def set_phone(message: Message, state: FSMContext):
     await db.save_user(
         user_id=message.from_user.id,
         username=username,
-        role=role,
-        shop=shop,
+        role=_ROLE_TEXT_TO_RU.get(role, role),
+        shop=_SHOP_TEXT_TO_RU.get(shop, shop),
         lang=lang,
         phone=contact.phone_number,
     )
@@ -276,7 +303,7 @@ async def set_role(message: Message, state: FSMContext):
         return
 
     role = (message.text or "").strip()
-    if role not in {"Курьер", "Сборщик"}:
+    if role not in _ROLE_TEXT_TO_RU:
         await message.answer(tr("role_prompt", message.from_user.id), reply_markup=get_role_kb(get_user_lang(message.from_user.id)))
         return
 
@@ -287,8 +314,8 @@ async def set_role(message: Message, state: FSMContext):
     await db.save_user(
         user_id=message.from_user.id,
         username=message.from_user.username,
-        role=role,
-        shop=shop,
+        role=_ROLE_TEXT_TO_RU.get(role, role),
+        shop=_SHOP_TEXT_TO_RU.get(shop, shop),
         lang=lang,
         phone=phone,
     )
@@ -305,7 +332,7 @@ async def set_shop(message: Message, state: FSMContext):
         return
 
     shop = (message.text or "").strip()
-    if shop not in {"Бухарестская", "Бабушкина"}:
+    if shop not in _SHOP_TEXT_TO_RU:
         await message.answer(tr("choose_shop", message.from_user.id), reply_markup=get_shop_kb(get_user_lang(message.from_user.id)))
         return
 
@@ -316,8 +343,8 @@ async def set_shop(message: Message, state: FSMContext):
     await db.save_user(
         user_id=message.from_user.id,
         username=message.from_user.username,
-        role=role,
-        shop=shop,
+        role=_ROLE_TEXT_TO_RU.get(role, role),
+        shop=_SHOP_TEXT_TO_RU.get(shop, shop),
         lang=lang,
         phone=phone,
     )
@@ -355,42 +382,333 @@ async def change_lang(message: Message, state: FSMContext):
     await message.answer(tr("choose_language", message.from_user.id), reply_markup=get_lang_kb())
 
 
+
 # -------------------------
-# TRAINING
+# KNOWLEDGE BASE (Обучалки + FAQ)
 # -------------------------
 
+SEARCH_BTNS = {
+    "RU": "🔎 Поиск",
+    "EN": "🔎 Search",
+    "UZ": "🔎 Qidirish",
+    "TJ": "🔎 Ҷустуҷӯ",
+    "KG": "🔎 Издөө",
+}
 
-async def _open_training(message: Message, state: FSMContext):
-    await _push_nav(state, "training")
+ADMIN_LIST_BTNS = {
+    "RU": "📋 Список материалов",
+    "EN": "📋 Materials list",
+    "UZ": "📋 Materiallar ro'yxati",
+    "TJ": "📋 Рӯйхати мавод",
+    "KG": "📋 Материалдар тизмеси",
+}
+ADMIN_ADD_BTNS = {
+    "RU": "➕ Добавить материал",
+    "EN": "➕ Add material",
+    "UZ": "➕ Material qo‘shish",
+    "TJ": "➕ Илова кардани мавод",
+    "KG": "➕ Материал кошуу",
+}
+ADMIN_EDIT_BTNS = {
+    "RU": "✏️ Редактировать материал",
+    "EN": "✏️ Edit material",
+    "UZ": "✏️ Materialni tahrirlash",
+    "TJ": "✏️ Таҳрири мавод",
+    "KG": "✏️ Материалды түзөтүү",
+}
+ADMIN_DEL_BTNS = {
+    "RU": "🗑 Удалить материал",
+    "EN": "🗑 Delete material",
+    "UZ": "🗑 Materialni o‘chirish",
+    "TJ": "🗑 Пок кардани мавод",
+    "KG": "🗑 Өчүрүү",
+}
+
+def _kb_label(user_id: int, mapping: dict[str,str], default: str) -> str:
+    lang = get_user_lang(user_id)
+    return mapping.get(lang, default)
+
+
+def _knowledge_kb(user_id: int, role: str | None, lang: str, is_admin_user: bool) -> ReplyKeyboardMarkup:
+    materials = db.materials_for_role(role, limit=24)
+    rows: list[list[KeyboardButton]] = []
+
+    # темы (по 2 в ряд)
+    buf: list[KeyboardButton] = []
+    for m in materials:
+        title = (m.get("title") or "").strip()
+        if not title:
+            continue
+        buf.append(KeyboardButton(text=title))
+        if len(buf) == 2:
+            rows.append(buf)
+            buf = []
+    if buf:
+        rows.append(buf)
+
+    # поиск
+    rows.append([KeyboardButton(text=_kb_label(user_id, SEARCH_BTNS, SEARCH_BTNS["RU"]))])
+
+    # админские действия
+    if is_admin_user:
+        rows.append([KeyboardButton(text=_kb_label(user_id, ADMIN_LIST_BTNS, ADMIN_LIST_BTNS["RU"]))])
+        rows.append([
+            KeyboardButton(text=_kb_label(user_id, ADMIN_ADD_BTNS, ADMIN_ADD_BTNS["RU"])),
+            KeyboardButton(text=_kb_label(user_id, ADMIN_EDIT_BTNS, ADMIN_EDIT_BTNS["RU"])),
+        ])
+        rows.append([KeyboardButton(text=_kb_label(user_id, ADMIN_DEL_BTNS, ADMIN_DEL_BTNS["RU"]))])
+
+    # навигация
+    rows.append([KeyboardButton(text=btn(lang, "back")), KeyboardButton(text=btn(lang, "home"))])
+
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
+
+async def _open_knowledge(message: Message, state: FSMContext):
+    await _push_nav(state, "training")  # сохраняем старое имя экрана для совместимости
     user = db.get_user(message.from_user.id)
     role = user[2] if user else ""
     lang = get_user_lang(message.from_user.id)
-    await message.answer("📚 Выберите тему:", reply_markup=get_training_kb(role, lang=lang))
+    is_admin_user = message.from_user.id in ADMIN_IDS
+    await message.answer(
+        tr("kb_menu", message.from_user.id),
+        reply_markup=_knowledge_kb(message.from_user.id, role, lang, is_admin_user),
+    )
 
 
 @router.message(F.text.in_(all_btn_texts("training")))
 async def training_menu(message: Message, state: FSMContext):
     if await _check_banned(message):
         return
-    await _open_training(message, state)
+    await _open_knowledge(message, state)
 
 
-@router.message(F.text.in_({"Основные правила", "Погрузка", "Подключение терминала", "Правила сборки", "Возвраты", "Закрытие точки"}))
-async def training_topic(message: Message, state: FSMContext):
-    # Simple knowledge base for topics (can be expanded later)
-    topic = (message.text or "").strip()
-    user_id = message.from_user.id
-    lang = get_user_lang(user_id)
+# Старые клиенты могут прислать кнопку FAQ из предыдущего меню — считаем это тем же разделом.
+@router.message(F.text.in_(all_btn_texts("faq")))
+async def faq_alias(message: Message, state: FSMContext):
+    if await _check_banned(message):
+        return
+    await _open_knowledge(message, state)
 
-    texts = {
-        "Основные правила": "• Соблюдайте технику безопасности\n• Следуйте инструкциям супервайзера\n• Проверяйте заказы перед выдачей/выездом",
-        "Погрузка": "• Аккуратно размещайте товары\n• Тяжёлое — вниз\n• Хрупкое — сверху\n• Проверяйте целостность",
-        "Подключение терминала": "• Включите терминал\n• Проверьте интернет\n• Войдите в приложение\n• Проведите тестовую операцию",
-        "Правила сборки": "• Собирайте по списку\n• Проверяйте сроки годности\n• Хрупкое упаковывайте отдельно",
-        "Возвраты": "• Зафиксируйте причину\n• Сфотографируйте при необходимости\n• Сообщите старшему смены",
-        "Закрытие точки": "• Сверьте остатки\n• Уберите рабочее место\n• Сообщите о проблемах супервайзеру",
-    }
-    await message.answer(texts.get(topic, "Материал пока готовится."), reply_markup=get_training_kb((db.get_user(user_id) or (None,None,None,None,lang))[2], lang=lang))
+
+@router.message(F.text.in_(set(SEARCH_BTNS.values())))
+async def kb_search_prompt(message: Message, state: FSMContext):
+    if await _check_banned(message):
+        return
+    await _push_nav(state, "faq")  # логически это поиск, но раздел тот же
+    await state.set_state(FAQState.query)
+    await message.answer(tr("kb_search_prompt", message.from_user.id))
+
+
+@router.message(FAQState.query)
+async def kb_search(message: Message, state: FSMContext):
+    if await _check_banned(message):
+        return
+    q = (message.text or "").strip()
+    results = db.search_faq(q, limit=5)
+    if not results:
+        await message.answer(tr("kb_not_found", message.from_user.id))
+        return
+
+    text = tr("kb_found_header", message.from_user.id)
+    for r in results:
+        text += f"• <b>{r.get('title','')}</b>\n"
+    text += "{pick_topic}"
+
+    # вернём клавиатуру материалов
+    user = db.get_user(message.from_user.id)
+    role = user[2] if user else ""
+    lang = get_user_lang(message.from_user.id)
+    await state.clear()
+    await message.answer(text, reply_markup=_knowledge_kb(message.from_user.id, role, lang, message.from_user.id in ADMIN_IDS))
+
+
+def _is_topic_title(text: str) -> bool:
+    t = (text or "").strip()
+    if not t:
+        return False
+    # точное совпадение по title
+    for a in db.FAQ_ARTICLES:
+        if (a.get("title") or "").strip() == t:
+            return True
+    return False
+
+
+@router.message(F.text.func(_is_topic_title))
+async def kb_open_topic(message: Message, state: FSMContext):
+    if await _check_banned(message):
+        return
+    title = (message.text or "").strip()
+    # найдём статью
+    article = next((a for a in db.FAQ_ARTICLES if (a.get("title") or "").strip() == title), None)
+    body = (article or {}).get("body") or "Материал пока готовится."
+    await message.answer(body)
+
+
+# --- Admin: управление материалами прямо в чате ---
+
+
+@router.message(F.text.in_(set(ADMIN_LIST_BTNS.values())))
+async def admin_kb_list(message: Message, state: FSMContext):
+    if await _check_banned(message):
+        return
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer(tr("admin_no_access", message.from_user.id, id=message.from_user.id))
+        return
+
+    items = await db.faq_list(limit=200)
+    if not items:
+        await message.answer(tr("kb_no_materials", message.from_user.id))
+        return
+
+    text = "📋 Материалы (id — заголовок):\n\n"
+    for it in items[:200]:
+        text += f"{it.get('id')}. {it.get('title')}\n"
+    await message.answer(text)
+
+
+@router.message(F.text.in_(set(ADMIN_ADD_BTNS.values())))
+async def admin_kb_add_start(message: Message, state: FSMContext):
+    if await _check_banned(message):
+        return
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer(tr("admin_no_access", message.from_user.id, id=message.from_user.id))
+        return
+    await state.clear()
+    await state.set_state(TrainingAdminState.title)
+    await message.answer(tr("kb_admin_ask_title", message.from_user.id))
+
+
+@router.message(TrainingAdminState.title)
+async def admin_kb_add_title(message: Message, state: FSMContext):
+    title = (message.text or "").strip()
+    if not title:
+        await message.answer(tr("kb_admin_title_empty", message.from_user.id))
+        return
+    await state.update_data(title=title)
+    await state.set_state(TrainingAdminState.body)
+    await message.answer(tr("kb_admin_ask_body", message.from_user.id))
+
+
+@router.message(TrainingAdminState.body)
+async def admin_kb_add_body(message: Message, state: FSMContext):
+    body = (message.text or "").strip()
+    if not body:
+        await message.answer(tr("kb_admin_body_empty", message.from_user.id))
+        return
+    await state.update_data(body=body)
+    await state.set_state(TrainingAdminState.tags)
+    await message.answer(tr("kb_admin_ask_tags", message.from_user.id))
+
+
+@router.message(TrainingAdminState.tags)
+async def admin_kb_add_tags(message: Message, state: FSMContext):
+    data = await state.get_data()
+    tags = (message.text or "").strip()
+    if tags == "-":
+        tags = ""
+    fid = await db.faq_add(data["title"], data["body"], tags)
+    await state.clear()
+    await message.answer(tr("kb_admin_added", message.from_user.id, id=fid))
+
+
+@router.message(F.text.in_(set(ADMIN_DEL_BTNS.values())))
+async def admin_kb_del_start(message: Message, state: FSMContext):
+    if await _check_banned(message):
+        return
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer(tr("admin_no_access", message.from_user.id, id=message.from_user.id))
+        return
+    await state.clear()
+    await state.set_state(TrainingAdminState.target_id)
+    await message.answer(tr("kb_admin_ask_del_id", message.from_user.id))
+
+
+@router.message(TrainingAdminState.target_id)
+async def admin_kb_del_do(message: Message, state: FSMContext):
+    raw = (message.text or "").strip()
+    if not raw.isdigit():
+        await message.answer(tr("kb_admin_need_id", message.from_user.id))
+        return
+    ok = await db.faq_delete(int(raw))
+    await state.clear()
+    await message.answer(tr("kb_admin_deleted", message.from_user.id) if ok else tr("kb_not_found", message.from_user.id))
+
+
+@router.message(F.text.in_(set(ADMIN_EDIT_BTNS.values())))
+async def admin_kb_edit_start(message: Message, state: FSMContext):
+    if await _check_banned(message):
+        return
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer(tr("admin_no_access", message.from_user.id, id=message.from_user.id))
+        return
+    await state.clear()
+    await state.set_state(TrainingAdminState.target_id)
+    await state.update_data(action="edit")
+    await message.answer(tr("kb_admin_ask_edit_id", message.from_user.id))
+
+
+@router.message(TrainingAdminState.target_id, F.text.func(lambda t: (t or "").strip().isdigit()))
+async def admin_kb_edit_choose(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("action") != "edit":
+        return  # это не наш сценарий (удаление обрабатывается другим хэндлером)
+
+    fid = int((message.text or "0").strip())
+    items = await db.faq_list(limit=500)
+    item = next((x for x in items if int(x.get("id","0")) == fid), None)
+    if not item:
+        await message.answer(tr("kb_admin_not_found_id", message.from_user.id))
+        return
+
+    await state.update_data(target_id=fid)
+    await state.set_state(TrainingAdminState.title)
+    await message.answer(
+        tr("kb_admin_current_title", message.from_user.id, title=item.get("title",""))
+        + tr("kb_admin_send_new_title_or_dash", message.from_user.id)
+    )
+
+
+@router.message(TrainingAdminState.title)
+async def admin_kb_edit_title(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("action") != "edit":
+        # это сценарий добавления, его обработал другой хэндлер раньше
+        return
+
+    title = (message.text or "").strip()
+    if title == "-":
+        title = None
+    await state.update_data(title=title)
+    await state.set_state(TrainingAdminState.body)
+    await message.answer(tr("kb_admin_send_new_body_or_dash", message.from_user.id))
+
+
+@router.message(TrainingAdminState.body)
+async def admin_kb_edit_body(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("action") != "edit":
+        return
+    body = (message.text or "").strip()
+    if body == "-":
+        body = None
+    await state.update_data(body=body)
+    await state.set_state(TrainingAdminState.tags)
+    await message.answer(tr("kb_admin_send_new_tags_or_dash", message.from_user.id))
+
+
+@router.message(TrainingAdminState.tags)
+async def admin_kb_edit_tags(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("action") != "edit":
+        return
+    tags = (message.text or "").strip()
+    if tags == "-":
+        tags = None
+    fid = int(data["target_id"])
+    ok = await db.faq_edit(fid, title=data.get("title"), body=data.get("body"), tags=tags)
+    await state.clear()
+    await message.answer(tr("kb_admin_updated", message.from_user.id) if ok else tr("kb_admin_update_fail", message.from_user.id))
 
 
 # -------------------------
@@ -405,7 +723,7 @@ async def links(message: Message, state: FSMContext):
     user = db.get_user(message.from_user.id)
     shop = user[3] if user else None
     await _push_nav(state, "links")
-    await message.answer(get_links_text(shop), disable_web_page_preview=True)
+    await message.answer(get_links_text(shop), link_preview_options=LinkPreviewOptions(is_disabled=True))
 
 
 @router.message(F.text.in_(all_btn_texts("contacts")))
@@ -556,23 +874,9 @@ async def daily_off(message: Message, state: FSMContext):
 @router.message(Command("admin"))
 async def admin_help(message: Message):
     if not _is_admin(message.from_user.id):
+        await message.answer(tr("admin_no_access", message.from_user.id, id=message.from_user.id))
         return
-    txt = (
-        "👑 Admin\n\n"
-        "/stats — статистика\n"
-        "/users — список пользователей\n"
-        "/edit_user <id> <role/shop/lang/phone> <value> — правка\n"
-        "/broadcast <text> — рассылка\n"
-        "/cleanup — очистка фидбэков\n"
-        "/ban <id> / /unban <id>\n"
-        "/set_digest <text> — текст дайджеста\n\n"
-        "FAQ CRUD:\n"
-        "/faq_list\n"
-        "/faq_add title || body || tags\n"
-        "/faq_del <id>\n"
-        "/faq_edit <id> || title || body || tags\n"
-    )
-    await message.answer(txt)
+        await message.answer(tr("admin_help", message.from_user.id))
 
 
 @router.message(Command("stats"))
@@ -582,7 +886,7 @@ async def admin_stats(message: Message):
     users = len(db.get_all_users())
     fb = len(db.get_feedback())
     banned = len(db.banned_users)
-    await message.answer(f"👥 Users: {users}\n📩 Feedback: {fb}\n⛔ Banned: {banned}")
+    await message.answer(tr("admin_stats_text", message.from_user.id, users=users, fb=fb, banned=banned))
 
 
 @router.message(Command("users"))
@@ -591,7 +895,7 @@ async def admin_users(message: Message):
         return
     users = db.get_all_users()
     if not users:
-        await message.answer("Пользователей нет")
+        await message.answer(tr("admin_users_empty", message.from_user.id))
         return
     lines = []
     for u in users[:50]:
@@ -608,24 +912,24 @@ async def admin_edit_user(message: Message):
         return
     parts = (message.text or "").split(maxsplit=3)
     if len(parts) < 4:
-        await message.answer("Формат: /edit_user <id> <role/shop/lang/phone> <value>")
+        await message.answer(tr("admin_format_edit_user", message.from_user.id))
         return
     uid = int(parts[1])
     field = parts[2].lower()
     value = parts[3].strip()
     u = db.get_user(uid)
     if not u:
-        await message.answer("Пользователь не найден")
+        await message.answer(tr("admin_user_not_found", message.from_user.id))
         return
     d = _user_tuple_to_dict(u)
     if field not in {"role", "shop", "lang", "phone"}:
-        await message.answer("Поле должно быть role/shop/lang/phone")
+        await message.answer(tr("admin_bad_field", message.from_user.id))
         return
     if field == "lang":
         value = value.upper()
     d[field] = value
     await db.save_user(uid, d["username"], d["role"], d["shop"], d["lang"], d["phone"])  # type: ignore[arg-type]
-    await message.answer("✅ Обновлено")
+    await message.answer(tr("kb_admin_updated", message.from_user.id))
 
 
 @router.message(Command("broadcast"))
@@ -634,7 +938,7 @@ async def admin_broadcast(message: Message):
         return
     text = (message.text or "").replace("/broadcast", "", 1).strip()
     if not text:
-        await message.answer("Формат: /broadcast <text>")
+        await message.answer(tr("admin_format_broadcast", message.from_user.id))
         return
     users = db.get_all_users()
     sent = 0
@@ -647,7 +951,7 @@ async def admin_broadcast(message: Message):
             sent += 1
         except Exception:
             continue
-    await message.answer(f"✅ Sent: {sent}")
+    await message.answer(tr("admin_sent", message.from_user.id, sent=sent))
 
 
 @router.message(Command("cleanup"))
@@ -655,7 +959,7 @@ async def admin_cleanup(message: Message):
     if not _is_admin(message.from_user.id):
         return
     await db.cleanup_feedback()
-    await message.answer("✅ Feedback очищен")
+    await message.answer(tr("admin_feedback_cleared", message.from_user.id))
 
 
 @router.message(Command("ban"))
@@ -664,11 +968,11 @@ async def admin_ban(message: Message):
         return
     parts = (message.text or "").split()
     if len(parts) < 2 or not parts[1].isdigit():
-        await message.answer("Формат: /ban <user_id>")
+        await message.answer(tr("admin_format_ban", message.from_user.id))
         return
     uid = int(parts[1])
     await db.ban_user(uid)
-    await message.answer("✅ Banned")
+    await message.answer(tr("admin_banned_ok", message.from_user.id))
 
 
 @router.message(Command("unban"))
@@ -677,11 +981,11 @@ async def admin_unban(message: Message):
         return
     parts = (message.text or "").split()
     if len(parts) < 2 or not parts[1].isdigit():
-        await message.answer("Формат: /unban <user_id>")
+        await message.answer(tr("admin_format_unban", message.from_user.id))
         return
     uid = int(parts[1])
     await db.unban_user(uid)
-    await message.answer("✅ Unbanned")
+    await message.answer(tr("admin_unbanned_ok", message.from_user.id))
 
 
 @router.message(Command("set_digest"))
@@ -690,10 +994,10 @@ async def admin_set_digest(message: Message):
         return
     text = (message.text or "").replace("/set_digest", "", 1).strip()
     if not text:
-        await message.answer("Формат: /set_digest <text>")
+        await message.answer(tr("admin_format_set_digest", message.from_user.id))
         return
     await db.set_daily_digest_message(text)
-    await message.answer("✅ Updated")
+    await message.answer(tr("admin_updated", message.from_user.id))
 
 
 # --- FAQ admin CRUD
@@ -703,7 +1007,7 @@ async def admin_faq_list(message: Message):
         return
     items = await db.faq_list(limit=50)
     if not items:
-        await message.answer("FAQ пуст")
+        await message.answer(tr("admin_faq_empty", message.from_user.id))
         return
     await message.answer("\n".join([f"{a['id']}. {a['title']}" for a in items]))
 
@@ -716,10 +1020,10 @@ async def admin_faq_add(message: Message):
     try:
         title, body, tags = [x.strip() for x in raw.split("||")]
     except Exception:
-        await message.answer("Формат: /faq_add title || body || tags")
+        await message.answer(tr("admin_format_faq_add", message.from_user.id))
         return
     fid = await db.faq_add(title, body, tags)
-    await message.answer(f"✅ Добавлено (id={fid})")
+    await message.answer(tr("kb_admin_added", message.from_user.id, id=fid))
 
 
 @router.message(Command("faq_del"))
@@ -728,10 +1032,10 @@ async def admin_faq_del(message: Message):
         return
     parts = (message.text or "").split()
     if len(parts) < 2 or not parts[1].isdigit():
-        await message.answer("Формат: /faq_del <id>")
+        await message.answer(tr("admin_format_faq_del", message.from_user.id))
         return
     ok = await db.faq_delete(int(parts[1]))
-    await message.answer("✅ Удалено" if ok else "Не найдено")
+    await message.answer(tr("kb_admin_deleted", message.from_user.id) if ok else tr("common_not_found", message.from_user.id))
 
 
 @router.message(Command("faq_edit"))
@@ -741,14 +1045,14 @@ async def admin_faq_edit(message: Message):
     raw = (message.text or "").replace("/faq_edit", "", 1).strip()
     parts = [x.strip() for x in raw.split("||")]
     if not parts or not parts[0].isdigit():
-        await message.answer("Формат: /faq_edit <id> || title || body || tags")
+        await message.answer(tr("admin_format_faq_edit", message.from_user.id))
         return
     fid = int(parts[0])
     title = parts[1] if len(parts) > 1 and parts[1] else None
     body = parts[2] if len(parts) > 2 and parts[2] else None
     tags = parts[3] if len(parts) > 3 and parts[3] else None
     ok = await db.faq_edit(fid, title=title, body=body, tags=tags)
-    await message.answer("✅ Обновлено" if ok else "Не найдено")
+    await message.answer(tr("kb_admin_updated", message.from_user.id) if ok else tr("common_not_found", message.from_user.id))
 
 
 # -------------------------
@@ -777,7 +1081,7 @@ async def scheduler_loop(bot: Bot):
             due = await db.pop_due_reminders(now_ts)
             for r in due:
                 try:
-                    await bot.send_message(r.user_id, f"⏰ Напоминание:\n{r.text}")
+                    await bot.send_message(r.user_id, tr("reminder_push", r.user_id, text=r.text))
                 except Exception:
                     continue
 

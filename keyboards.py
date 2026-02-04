@@ -18,11 +18,11 @@ BUTTONS = {
         "KG": "🌐 Тилди өзгөртүү",
     },
     "training": {
-        "RU": "📚 Обучалки",
-        "EN": "📚 Training",
-        "UZ": "📚 O‘quv",
-        "TJ": "📚 Омӯзиш",
-        "KG": "📚 Окутуу",
+        "RU": "📚 Обучалки / FAQ",
+        "EN": "📚 Training / FAQ",
+        "UZ": "📚 O‘quv / FAQ",
+        "TJ": "📚 Омӯзиш / FAQ",
+        "KG": "📚 Окутуу / FAQ",
     },
     "faq": {
         "RU": "❓ FAQ",
@@ -120,20 +120,35 @@ def get_lang_kb():
     )
 
 # ===== Выбор роли =====
-def get_role_kb(lang="RU"):
+ROLE_LABELS = {
+    "RU": {"courier": "Курьер", "picker": "Сборщик"},
+    "EN": {"courier": "Courier", "picker": "Picker"},
+    "UZ": {"courier": "Kuryer", "picker": "Yig‘uvchi"},
+    "TJ": {"courier": "Курьер", "picker": "Ҷамъоварӣ"},
+    "KG": {"courier": "Курьер", "picker": "Терүүчү"},
+}
+
+SHOP_LABELS = {
+    # названия точек — обычно собственные, но дадим “человечные” подписи
+    "RU": {"Бухарестская": "Бухарестская", "Бабушкина": "Бабушкина"},
+    "EN": {"Бухарестская": "Bukharestskaya", "Бабушкина": "Babushkina"},
+    "UZ": {"Бухарестская": "Buxarestskaya", "Бабушкина": "Babushkina"},
+    "TJ": {"Бухарестская": "Бухарестская", "Бабушкина": "Бабушкина"},
+    "KG": {"Бухарестская": "Бухарестская", "Бабушкина": "Бабушкина"},
+}
+
+def get_role_kb(lang: str = "RU"):
+    labels = ROLE_LABELS.get(lang, ROLE_LABELS["RU"])
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="Курьер"), KeyboardButton(text="Сборщик")]
-        ],
+        keyboard=[[KeyboardButton(text=labels["courier"]), KeyboardButton(text=labels["picker"])]],
         resize_keyboard=True
     )
 
 # ===== Выбор магазина =====
-def get_shop_kb(lang="RU"):
+def get_shop_kb(lang: str = "RU"):
+    labels = SHOP_LABELS.get(lang, SHOP_LABELS["RU"])
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="Бухарестская"), KeyboardButton(text="Бабушкина")]
-        ],
+        keyboard=[[KeyboardButton(text=labels["Бухарестская"]), KeyboardButton(text=labels["Бабушкина"])]],
         resize_keyboard=True
     )
 
@@ -141,7 +156,7 @@ def get_shop_kb(lang="RU"):
 def main_menu(role, user_id, lang="RU"):
     kb = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=btn(lang, "training")), KeyboardButton(text=btn(lang, "faq"))],
+            [KeyboardButton(text=btn(lang, "training"))],
             [KeyboardButton(text=btn(lang, "reminders"))],
             [KeyboardButton(text=btn(lang, "links"))],
             [KeyboardButton(text=btn(lang, "contacts"))],
@@ -202,27 +217,53 @@ SUPERVISOR_CONTACT = (
 )
 
 # ===== Ссылки по магазину =====
+
 def get_links_text(shop):
+    """Возвращает HTML-текст со ссылками (под parse_mode=HTML)."""
+    def a(text: str, url: str) -> str:
+        return f'<a href="{url}">{text}</a>'
+
     if shop == "Бабушкина":
         return (
-            "[Ссылка на чат с сотрудниками магазина](https://t.me/+QQ0hPMMEZuhmYmFi)\n"
-            "[Канал с новостями](https://t.me/+4yNEGoqcXwU2ZDky)\n"
-            "[Чат самовывоза](https://t.me/+wCg1Tj5G-LQ1ZmIy)\n"
+            f"{a('Чат с сотрудниками магазина', 'https://t.me/+QQ0hPMMEZuhmYmFi')}\n"
+            f"{a('Канал с новостями', 'https://t.me/+4yNEGoqcXwU2ZDky')}\n"
+            f"{a('Чат самовывоза', 'https://t.me/+wCg1Tj5G-LQ1ZmIy')}\n"
             "Горячая линия для партнеров: +7 800 333-24-28\n"
             "Бот КУПЕР: @SM_courierinfo_bot\n"
-            "[Партнерский портал](https://partner.kuper.ru/)"
+            f"{a('Партнерский портал', 'https://partner.kuper.ru/')}"
         )
     elif shop == "Бухарестская":
         return (
-            "[Ссылка на чат с сотрудниками магазина](https://t.me/buharestscayg)\n"
-            "[Канал с новостями](https://t.me/+4yNEGoqcXwU2ZDky)\n"
-            "[Чат самовывоза](https://t.me/+M77ybMN2m08zNGUy)\n"
+            f"{a('Чат с сотрудниками магазина', 'https://t.me/buharestscayg')}\n"
+            f"{a('Канал с новостями', 'https://t.me/+4yNEGoqcXwU2ZDky')}\n"
+            f"{a('Чат самовывоза', 'https://t.me/+M77ybMN2m08zNGUy')}\n"
             "Горячая линия для партнеров: +7 800 333-24-28\n"
             "Бот КУПЕР: @SM_courierinfo_bot\n"
-            "[Партнерский портал](https://partner.kuper.ru/)"
+            f"{a('Партнерский портал', 'https://partner.kuper.ru/')}"
+        )
+    elif shop == "Комендантский":
+        return (
+            f"{a('Чат с сотрудниками магазина', 'https://t.me/+E5Ok9aVVqHc2MWIy')}\n"
+            f"{a('Канал с новостями', 'https://t.me/+4yNEGoqcXwU2ZDky')}\n"
+            f"{a('Чат самовывоза', 'https://t.me/+d8GZc2E4R7c3OGIy')}\n"
+            "Горячая линия для партнеров: +7 800 333-24-28\n"
+            "Бот КУПЕР: @SM_courierinfo_bot\n"
+            f"{a('Партнерский портал', 'https://partner.kuper.ru/')}"
+        )
+    elif shop == "Парнас":
+        return (
+            f"{a('Чат с сотрудниками магазина', 'https://t.me/+vzwyU4T4HfA5NmFi')}\n"
+            f"{a('Канал с новостями', 'https://t.me/+4yNEGoqcXwU2ZDky')}\n"
+            f"{a('Чат самовывоза', 'https://t.me/+v-qnHzWv7NQzZTIy')}\n"
+            "Горячая линия для партнеров: +7 800 333-24-28\n"
+            "Бот КУПЕР: @SM_courierinfo_bot\n"
+            f"{a('Партнерский портал', 'https://partner.kuper.ru/')}"
         )
     else:
-        return "Ссылки недоступны для вашей точки"
+        return (
+            "Выберите точку при регистрации, чтобы получить ссылки.\n"
+            f"{a('Партнерский портал', 'https://partner.kuper.ru/')}"
+        )
 
 def phone_request_kb(lang: str) -> ReplyKeyboardMarkup:
     """Клавиатура запроса контакта (Telegram Contact)."""
