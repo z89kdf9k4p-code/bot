@@ -587,11 +587,16 @@ async def admin_kb_add_start(message: Message, state: FSMContext):
         return
     await state.clear()
     await state.set_state(TrainingAdminState.title)
+    # Явно помечаем сценарий добавления, чтобы не конфликтовать со сценарием редактирования
+    await state.update_data(action="add")
     await message.answer(tr("kb_admin_ask_title", message.from_user.id))
 
 
 @router.message(TrainingAdminState.title)
 async def admin_kb_add_title(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("action") not in (None, "add"):
+        return
     title = (message.text or "").strip()
     if not title:
         await message.answer(tr("kb_admin_title_empty", message.from_user.id))
@@ -603,6 +608,9 @@ async def admin_kb_add_title(message: Message, state: FSMContext):
 
 @router.message(TrainingAdminState.body)
 async def admin_kb_add_body(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("action") not in (None, "add"):
+        return
     body = (message.text or "").strip()
     if not body:
         await message.answer(tr("kb_admin_body_empty", message.from_user.id))
@@ -615,6 +623,8 @@ async def admin_kb_add_body(message: Message, state: FSMContext):
 @router.message(TrainingAdminState.tags)
 async def admin_kb_add_tags(message: Message, state: FSMContext):
     data = await state.get_data()
+    if data.get("action") not in (None, "add"):
+        return
     tags = (message.text or "").strip()
     if tags == "-":
         tags = ""
@@ -632,11 +642,20 @@ async def admin_kb_del_start(message: Message, state: FSMContext):
         return
     await state.clear()
     await state.set_state(TrainingAdminState.target_id)
+    # Явно помечаем сценарий удаления, чтобы не конфликтовать со сценарием редактирования
+    await state.update_data(action="delete")
     await message.answer(tr("kb_admin_ask_del_id", message.from_user.id))
 
 
 @router.message(TrainingAdminState.target_id)
 async def admin_kb_del_do(message: Message, state: FSMContext):
+    data = await state.get_data()
+    # Если сейчас идёт редактирование (action=edit), этот хэндлер не должен срабатывать
+    if data.get("action") == "edit":
+        return
+    # Если action задан и это не delete — тоже выходим
+    if data.get("action") not in (None, "delete"):
+        return
     raw = (message.text or "").strip()
     if not raw.isdigit():
         await message.answer(tr("kb_admin_need_id", message.from_user.id))
