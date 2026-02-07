@@ -55,10 +55,17 @@ from translations import get_user_lang, tr
 # -------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+# Поддерживаем оба варианта файла окружения: ".env" и "env" (в репозитории есть env).
+_dotenv_loaded = load_dotenv(os.path.join(BASE_DIR, ".env"))
+if not _dotenv_loaded:
+    load_dotenv(os.path.join(BASE_DIR, "env"))
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
-BOT_DB = os.getenv("BOT_DB", "bot.db").strip() or "bot.db"
+
+# Важно: путь к БД должен быть стабильным между перезапусками.
+# Если BOT_DB относительный, сохраняем его рядом с bot.py.
+_raw_db = (os.getenv("BOT_DB", "bot.db") or "bot.db").strip()
+BOT_DB = _raw_db if os.path.isabs(_raw_db) else os.path.join(BASE_DIR, _raw_db)
 
 def _parse_admin_ids(raw: str) -> set[int]:
     if not raw:
@@ -71,8 +78,12 @@ def _parse_admin_ids(raw: str) -> set[int]:
             out.add(int(part))
     return out
 
-# Admins: comma-separated or space-separated user ids in .env (ADMIN_IDS=123,456)
-ADMIN_IDS: set[int] = _parse_admin_ids(os.getenv("ADMIN_IDS", ""))
+# Admins: comma-separated or space-separated user ids.
+# Поддерживаем несколько имён переменных, т.к. в разных деплоях часто путают.
+ADMIN_IDS: set[int] = set()
+ADMIN_IDS |= _parse_admin_ids(os.getenv("ADMIN_IDS", ""))
+ADMIN_IDS |= _parse_admin_ids(os.getenv("ADMIN_ID", ""))
+ADMIN_IDS |= _parse_admin_ids(os.getenv("ADMIN_TELEGRAM_ID", ""))
 
 # Scheduler timezone (as requested by system: Europe/Oslo)
 TZ = ZoneInfo("Europe/Oslo")
@@ -876,7 +887,7 @@ async def admin_help(message: Message):
     if not _is_admin(message.from_user.id):
         await message.answer(tr("admin_no_access", message.from_user.id, id=message.from_user.id))
         return
-        await message.answer(tr("admin_help", message.from_user.id))
+    await message.answer(tr("admin_help", message.from_user.id))
 
 
 @router.message(Command("stats"))
