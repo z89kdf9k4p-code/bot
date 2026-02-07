@@ -311,11 +311,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "/stats\n"
               "/users\n"
               "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
-              "/broadcast <text>\n"
+	              "/broadcast &lt;text&gt;\n"
               "/cleanup\n"
-              "/ban <user_id>\n"
-              "/unban <user_id>\n"
-              "/set_digest <text>\n\n"
+	              "/ban &lt;user_id&gt;\n"
+	              "/unban &lt;user_id&gt;\n"
+	              "/set_digest &lt;text&gt;\n\n"
               "Материалы (Обучалки/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
@@ -325,11 +325,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "/stats\n"
               "/users\n"
               "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
-              "/broadcast <text>\n"
+	              "/broadcast &lt;text&gt;\n"
               "/cleanup\n"
-              "/ban <user_id>\n"
-              "/unban <user_id>\n"
-              "/set_digest <text>\n\n"
+	              "/ban &lt;user_id&gt;\n"
+	              "/unban &lt;user_id&gt;\n"
+	              "/set_digest &lt;text&gt;\n\n"
               "Materials (Training/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
@@ -339,11 +339,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "/stats\n"
               "/users\n"
               "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
-              "/broadcast <text>\n"
+	              "/broadcast &lt;text&gt;\n"
               "/cleanup\n"
-              "/ban <user_id>\n"
-              "/unban <user_id>\n"
-              "/set_digest <text>\n\n"
+	              "/ban &lt;user_id&gt;\n"
+	              "/unban &lt;user_id&gt;\n"
+	              "/set_digest &lt;text&gt;\n\n"
               "Materiallar (O‘quv/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
@@ -353,11 +353,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "/stats\n"
               "/users\n"
               "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
-              "/broadcast <text>\n"
+	              "/broadcast &lt;text&gt;\n"
               "/cleanup\n"
-              "/ban <user_id>\n"
-              "/unban <user_id>\n"
-              "/set_digest <text>\n\n"
+	              "/ban &lt;user_id&gt;\n"
+	              "/unban &lt;user_id&gt;\n"
+	              "/set_digest &lt;text&gt;\n\n"
               "Мавод (Омӯзиш/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
@@ -367,11 +367,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "/stats\n"
               "/users\n"
               "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
-              "/broadcast <text>\n"
+	              "/broadcast &lt;text&gt;\n"
               "/cleanup\n"
-              "/ban <user_id>\n"
-              "/unban <user_id>\n"
-              "/set_digest <text>\n\n"
+	              "/ban &lt;user_id&gt;\n"
+	              "/unban &lt;user_id&gt;\n"
+	              "/set_digest &lt;text&gt;\n\n"
               "Материалдар (Окутуу/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
@@ -379,11 +379,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "/faq_edit &lt;id&gt; || title || body || tags\n",
     },
     "admin_format_broadcast": {
-        "RU": "Формат: /broadcast <text>",
-        "EN": "Format: /broadcast <text>",
-        "UZ": "Format: /broadcast <text>",
-        "TJ": "Формат: /broadcast <text>",
-        "KG": "Format: /broadcast <text>",
+	    "RU": "Формат: /broadcast &lt;text&gt;",
+	    "EN": "Format: /broadcast &lt;text&gt;",
+	    "UZ": "Format: /broadcast &lt;text&gt;",
+	    "TJ": "Формат: /broadcast &lt;text&gt;",
+	    "KG": "Format: /broadcast &lt;text&gt;",
     },
     "admin_sent": {
         "RU": "✅ Sent: {sent}",
@@ -428,18 +428,18 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "KG": "Талаа role/shop/lang/phone болушу керек",
     },
     "admin_format_ban": {
-        "RU": "Формат: /ban <user_id>",
-        "EN": "Format: /ban <user_id>",
-        "UZ": "Format: /ban <user_id>",
-        "TJ": "Формат: /ban <user_id>",
-        "KG": "Format: /ban <user_id>",
+	    "RU": "Формат: /ban &lt;user_id&gt;",
+	    "EN": "Format: /ban &lt;user_id&gt;",
+	    "UZ": "Format: /ban &lt;user_id&gt;",
+	    "TJ": "Формат: /ban &lt;user_id&gt;",
+	    "KG": "Format: /ban &lt;user_id&gt;",
     },
     "admin_format_unban": {
-        "RU": "Формат: /unban <user_id>",
-        "EN": "Format: /unban <user_id>",
-        "UZ": "Format: /unban <user_id>",
-        "TJ": "Формат: /unban <user_id>",
-        "KG": "Format: /unban <user_id>",
+	    "RU": "Формат: /unban &lt;user_id&gt;",
+	    "EN": "Format: /unban &lt;user_id&gt;",
+	    "UZ": "Format: /unban &lt;user_id&gt;",
+	    "TJ": "Формат: /unban &lt;user_id&gt;",
+	    "KG": "Format: /unban &lt;user_id&gt;",
     },
     "admin_format_faq_edit": {
         "RU": "Формат: /faq_edit &lt;id&gt; || title || body || tags",
@@ -457,11 +457,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     },
 
 "admin_format_set_digest": {
-    "RU": "Формат: /set_digest <text>",
-    "EN": "Format: /set_digest <text>",
-    "UZ": "Format: /set_digest <text>",
-    "TJ": "Формат: /set_digest <text>",
-    "KG": "Format: /set_digest <text>",
+	"RU": "Формат: /set_digest &lt;text&gt;",
+	"EN": "Format: /set_digest &lt;text&gt;",
+	"UZ": "Format: /set_digest &lt;text&gt;",
+	"TJ": "Формат: /set_digest &lt;text&gt;",
+	"KG": "Format: /set_digest &lt;text&gt;",
 },
 "admin_banned_ok": {
     "RU": "✅ Пользователь забанен",
