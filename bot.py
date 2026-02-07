@@ -547,8 +547,20 @@ def _is_topic_title(text: str) -> bool:
 
 @router.message(F.text.func(_is_topic_title))
 async def kb_open_topic(message: Message, state: FSMContext):
+    # Если мы внутри админского сценария (добавление/редактирование/удаление) —
+    # не перехватываем сообщения как "выбор темы"
+    cur = await state.get_state()
+    if cur in {
+        TrainingAdminState.target_id.state,
+        TrainingAdminState.title.state,
+        TrainingAdminState.body.state,
+        TrainingAdminState.tags.state,
+    }:
+        return
+
     if await _check_banned(message):
         return
+
     title = (message.text or "").strip()
     # найдём статью
     article = next((a for a in db.FAQ_ARTICLES if (a.get("title") or "").strip() == title), None)
@@ -697,6 +709,20 @@ async def admin_kb_edit_choose(message: Message, state: FSMContext):
         tr("kb_admin_current_title", message.from_user.id, title=item.get("title",""))
         + tr("kb_admin_send_new_title_or_dash", message.from_user.id)
     )
+
+
+
+@router.message(TrainingAdminState.target_id)
+async def admin_kb_edit_need_digit(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("action") != "edit":
+        return  # не наш сценарий
+
+    raw = (message.text or "").strip()
+    if raw.isdigit():
+        return  # числовой ID обработает admin_kb_edit_choose
+
+    await message.answer("Отправьте числовой ID материала (например: 1).")
 
 
 @router.message(TrainingAdminState.title)
