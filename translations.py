@@ -310,7 +310,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "RU": "👑 Admin:\n\n"
               "/stats\n"
               "/users\n"
-              "/edit_user <id> <role/shop/lang/phone> <value>\n"
+              "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
               "/broadcast <text>\n"
               "/cleanup\n"
               "/ban <user_id>\n"
@@ -319,12 +319,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "Материалы (Обучалки/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
-              "/faq_del <id>\n"
-              "/faq_edit <id> || title || body || tags\n",
+              "/faq_del &lt;id&gt;\n"
+              "/faq_edit &lt;id&gt; || title || body || tags\n",
         "EN": "👑 Admin:\n\n"
               "/stats\n"
               "/users\n"
-              "/edit_user <id> <role/shop/lang/phone> <value>\n"
+              "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
               "/broadcast <text>\n"
               "/cleanup\n"
               "/ban <user_id>\n"
@@ -333,12 +333,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "Materials (Training/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
-              "/faq_del <id>\n"
-              "/faq_edit <id> || title || body || tags\n",
+              "/faq_del &lt;id&gt;\n"
+              "/faq_edit &lt;id&gt; || title || body || tags\n",
         "UZ": "👑 Admin:\n\n"
               "/stats\n"
               "/users\n"
-              "/edit_user <id> <role/shop/lang/phone> <value>\n"
+              "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
               "/broadcast <text>\n"
               "/cleanup\n"
               "/ban <user_id>\n"
@@ -347,12 +347,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "Materiallar (O‘quv/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
-              "/faq_del <id>\n"
-              "/faq_edit <id> || title || body || tags\n",
+              "/faq_del &lt;id&gt;\n"
+              "/faq_edit &lt;id&gt; || title || body || tags\n",
         "TJ": "👑 Admin:\n\n"
               "/stats\n"
               "/users\n"
-              "/edit_user <id> <role/shop/lang/phone> <value>\n"
+              "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
               "/broadcast <text>\n"
               "/cleanup\n"
               "/ban <user_id>\n"
@@ -361,12 +361,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "Мавод (Омӯзиш/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
-              "/faq_del <id>\n"
-              "/faq_edit <id> || title || body || tags\n",
+              "/faq_del &lt;id&gt;\n"
+              "/faq_edit &lt;id&gt; || title || body || tags\n",
         "KG": "👑 Admin:\n\n"
               "/stats\n"
               "/users\n"
-              "/edit_user <id> <role/shop/lang/phone> <value>\n"
+              "/edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;\n"
               "/broadcast <text>\n"
               "/cleanup\n"
               "/ban <user_id>\n"
@@ -375,8 +375,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
               "Материалдар (Окутуу/FAQ):\n"
               "/faq_list\n"
               "/faq_add title || body || tags\n"
-              "/faq_del <id>\n"
-              "/faq_edit <id> || title || body || tags\n",
+              "/faq_del &lt;id&gt;\n"
+              "/faq_edit &lt;id&gt; || title || body || tags\n",
     },
     "admin_format_broadcast": {
         "RU": "Формат: /broadcast <text>",
@@ -414,11 +414,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "KG": "✅ Пикирлер тазаланды",
     },
     "admin_format_edit_user": {
-        "RU": "Формат: /edit_user <id> <role/shop/lang/phone> <value>",
-        "EN": "Format: /edit_user <id> <role/shop/lang/phone> <value>",
-        "UZ": "Format: /edit_user <id> <role/shop/lang/phone> <value>",
-        "TJ": "Формат: /edit_user <id> <role/shop/lang/phone> <value>",
-        "KG": "Format: /edit_user <id> <role/shop/lang/phone> <value>",
+        "RU": "Формат: /edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;",
+        "EN": "Format: /edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;",
+        "UZ": "Format: /edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;",
+        "TJ": "Формат: /edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;",
+        "KG": "Format: /edit_user &lt;id&gt; &lt;role/shop/lang/phone&gt; &lt;value&gt;",
     },
     "admin_bad_field": {
         "RU": "Поле должно быть role/shop/lang/phone",
@@ -442,11 +442,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "KG": "Format: /unban <user_id>",
     },
     "admin_format_faq_edit": {
-        "RU": "Формат: /faq_edit <id> || title || body || tags",
-        "EN": "Format: /faq_edit <id> || title || body || tags",
-        "UZ": "Format: /faq_edit <id> || title || body || tags",
-        "TJ": "Формат: /faq_edit <id> || title || body || tags",
-        "KG": "Format: /faq_edit <id> || title || body || tags",
+        "RU": "Формат: /faq_edit &lt;id&gt; || title || body || tags",
+        "EN": "Format: /faq_edit &lt;id&gt; || title || body || tags",
+        "UZ": "Format: /faq_edit &lt;id&gt; || title || body || tags",
+        "TJ": "Формат: /faq_edit &lt;id&gt; || title || body || tags",
+        "KG": "Format: /faq_edit &lt;id&gt; || title || body || tags",
     },
     "admin_faq_empty": {
         "RU": "FAQ пуст",
@@ -558,11 +558,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     "KG": "Format: /faq_add title || body || tags",
 },
 "admin_format_faq_del": {
-    "RU": "Формат: /faq_del <id>",
-    "EN": "Format: /faq_del <id>",
-    "UZ": "Format: /faq_del <id>",
-    "TJ": "Формат: /faq_del <id>",
-    "KG": "Format: /faq_del <id>",
+    "RU": "Формат: /faq_del &lt;id&gt;",
+    "EN": "Format: /faq_del &lt;id&gt;",
+    "UZ": "Format: /faq_del &lt;id&gt;",
+    "TJ": "Формат: /faq_del &lt;id&gt;",
+    "KG": "Format: /faq_del &lt;id&gt;",
 },
 
     # Scheduler reminder push

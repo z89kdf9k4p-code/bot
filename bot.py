@@ -1072,8 +1072,21 @@ async def admin_faq_edit(message: Message):
 
 
 @router.errors()
-async def on_error(event, exception):
-    logger.error("Unhandled exception: %s", exception)
+async def on_error(event, exception=None):
+    """Global error handler.
+
+    aiogram v3 can call error handlers either as (event) where event is ErrorEvent
+    and the exception is available as event.exception, or as (event, exception)
+    in some setups/middlewares.
+
+    We support both signatures to avoid handler crashes masking the real error.
+    """
+
+    exc = exception
+    if exc is None and hasattr(event, "exception"):
+        exc = getattr(event, "exception")
+
+    logger.error("Unhandled exception: %s", exc)
     traceback.print_exc()
 
 
